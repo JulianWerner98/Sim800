@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        ".jsh": "java",
+        "*.jsh": "java",
+        "*.tpp": "cpp"
+    }
+}
