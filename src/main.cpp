@@ -68,7 +68,6 @@ String updateSerial(String message)
 	while (mySerial.available())
 	{
 		// Forward what Software Serial received to Serial Port
-		delay(20);
 		int c = mySerial.read();
 		if (c != 13 && c != 10)
 			back += (char)c;
@@ -115,6 +114,7 @@ void errorHandling()
 		}
 	} while (!returnValue.equals("OK"));
 	Serial.println("Module Ready");
+
 	fail = -1;
 	do
 	{
@@ -127,6 +127,20 @@ void errorHandling()
 		}
 	} while (!returnValue.equals("+CPIN: READYOK"));
 	Serial.println("Sim Ready");
+
+	fail = -1;
+	do
+	{
+		delay(1000);
+		returnValue = updateSerial("AT+CREG?");
+		if (fail++ > 65)
+		{
+			resetSim();
+			fail = -1;
+		}
+		Serial.println("->" + returnValue + "<-");
+	} while ((!returnValue.equals("+CREG: 0,1OK")) && !returnValue.equals("+CREG: 0,5OK"));
+	Serial.println("Sim Registered");
 	sendEnable = true;
 }
 void resetSim()
@@ -135,7 +149,7 @@ void resetSim()
 	digitalWrite(RESET, LOW);
 	delay(1000);
 	digitalWrite(RESET, HIGH);
-	delay(10000);
+	delay(20000);
 	Serial.println("End Reset");
 }
 ISR(TIMER2_COMPA_vect)
