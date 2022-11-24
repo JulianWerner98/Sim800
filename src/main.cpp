@@ -4,6 +4,8 @@
 SoftwareSerial mySerial(8, 9); // RX, TX
 int count = 1;
 long intervall = 0;
+int position = 0;
+char query[] = "+CMT: ";
 boolean sendEnable = false;
 boolean startSend = false;
 #define RESET 2
@@ -17,6 +19,7 @@ String updateSerial(String);
 void sendSMS(String);
 void errorHandling();
 void resetSim();
+String getSMS();
 
 void setup()
 {
@@ -47,8 +50,29 @@ void setup()
 
 void loop()
 {
-	
-	if(startSend) {
+	if (mySerial.available())
+	{
+		int read = mySerial.read();
+		if (read == query[position])
+		{
+			if (position++ >= 5)
+			{
+				String sms = getSMS();
+				sendSMS(sms);
+			}
+		}
+		else
+		{
+			position = 0;
+		}
+		Serial.write(read);
+	}
+	if (Serial.available())
+	{
+		mySerial.write(Serial.read());
+	}
+	if (startSend)
+	{
 		sendSMS(String(count++) + ". Message");
 		startSend = false;
 	}
@@ -82,8 +106,6 @@ void sendSMS(String message)
 {
 	Serial.println("Send SMS");
 	errorHandling();
-	// Configuring TEXT mode
-	updateSerial("AT+CMGF=1");
 
 	updateSerial("AT+CMGS=\"" + String(TELEFONE_NUMBER) + "\"");
 
@@ -138,7 +160,6 @@ void errorHandling()
 			resetSim();
 			fail = -1;
 		}
-		Serial.println("->" + returnValue + "<-");
 	} while ((!returnValue.equals("+CREG: 0,1OK")) && !returnValue.equals("+CREG: 0,5OK"));
 	Serial.println("Sim Registered");
 	sendEnable = true;
@@ -151,6 +172,8 @@ void resetSim()
 	digitalWrite(RESET, HIGH);
 	delay(20000);
 	Serial.println("End Reset");
+	updateSerial("AT+CMGF=1");
+	updateSerial("AT+CNMI=1,2");
 }
 ISR(TIMER2_COMPA_vect)
 {
@@ -166,4 +189,28 @@ ISR(TIMER2_COMPA_vect)
 			startSend = true;
 		}
 	}
+}
+
+String getSMS()
+{
+	String message = "";
+	boolean started = false;
+	Serial.println("Get SMS");
+	delay(500);
+	while (mySerial.available())
+	{
+		int c = mySerial.read();
+		if(c == 13) {
+			started = true; 
+		}
+		if(started) {
+			message += (char)c;
+		}
+		Serial.write(c);
+	}
+
+	message = message.substring(2, message.length()-2);
+	Serial.println("Message: " + message);
+	//updateSerial("AT+CMGDA=\"DEL ALL\"");
+	return message;	
 }
