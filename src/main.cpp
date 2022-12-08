@@ -3,14 +3,15 @@
 
 SoftwareSerial mySerial(8, 9); // RX, TX
 int count = 1;
-long intervall = 0;
+long intervall = 29000;
+int tries = 0;
 int position = 0;
 char query[] = "+CMT: ";
 boolean sendEnable = false;
 boolean startSend = false;
+#define INTERVALL 300 * 100 // in sek * 100
 #define RESET 2
 #define LED 13
-#define INTERVALL 30
 
 // XX = country code, e.g. "49" for Germany and xxxxxxxxxxx = phone number
 const char TELEFONE_NUMBER[] = "+491729999128";
@@ -25,6 +26,8 @@ void setup()
 {
 	pinMode(RESET, OUTPUT);
 	pinMode(LED, OUTPUT);
+	pinMode(5, OUTPUT);
+	digitalWrite(5, HIGH);
 	Serial.begin(9600);
 	mySerial.begin(9600);
 	// Setup Timer Interrupt
@@ -46,6 +49,7 @@ void setup()
 
 	delay(1000);
 	errorHandling();
+	digitalWrite(5, LOW);
 }
 
 void loop()
@@ -76,14 +80,18 @@ void loop()
 		sendSMS(String(count++) + ". Message");
 		startSend = false;
 	}
+	delay(100);
 }
 
-String updateSerial(String message)
+String updateSerial(String message = "")
 {
 	if (message.length())
+	{
+		delay(500);
 		mySerial.println(message);
+	}
 	String back = "";
-	delay(200);
+	delay(500);
 	while (Serial.available())
 	{
 		// Forward what Serial received to Software Serial Port
@@ -102,24 +110,6 @@ String updateSerial(String message)
 	return back;
 }
 
-void sendSMS(String message)
-{
-	Serial.println("Send SMS");
-	errorHandling();
-
-	updateSerial("AT+CMGS=\"" + String(TELEFONE_NUMBER) + "\"");
-
-	// SMS text content
-	updateSerial(message);
-	mySerial.write(26);
-	String back = updateSerial("");
-	Serial.println("->" + back + "<-");
-	if (back.length())
-	{
-		errorHandling();
-		sendSMS(message);
-	}
-}
 void errorHandling()
 {
 	sendEnable = false;
@@ -164,6 +154,7 @@ void errorHandling()
 	Serial.println("Sim Registered");
 	sendEnable = true;
 }
+
 void resetSim()
 {
 	Serial.println("Start Reset");
@@ -173,15 +164,63 @@ void resetSim()
 	delay(20000);
 	Serial.println("End Reset");
 	updateSerial("AT+CMGF=1");
-	updateSerial("AT+CNMI=1,2");
+	updateSerial("AT+CNMI=1,2,0,0,0");
+	updateSerial("AT+CMGDA=\"DEL ALL\"");
 }
+void sendSMS(String message)
+{
+	Serial.println("Send SMS");
+	errorHandling();
+
+	updateSerial("AT+CMGS=\"" + String(TELEFONE_NUMBER) + "\"");
+
+	// SMS text content
+	updateSerial(message);
+	mySerial.write(26);
+	String back = updateSerial();
+	Serial.println("->" + back + "<-");
+	if (back.length())
+	{
+		errorHandling();
+		if (tries++ <= 15)
+		{
+			sendSMS(message);
+		}
+		else
+		{
+			errorHandling();
+			sendSMS(message);
+			tries = 0;
+		}
+	}
+	tries = 0;
+	Serial.println("Successfully sended");
+	digitalWrite(5, LOW);
+}
+
+String getSMS()
+{
+	digitalWrite(5, HIGH);
+	String message = "";
+	Serial.println("Get SMS");
+	delay(5000);
+	String sms = mySerial.readString();
+	Serial.println("SMS is :" + sms);
+
+	int index = sms.indexOf(10);
+	message = sms.substring(index + 1, sms.length() - 2);
+	Serial.println("Message is : " + message);
+	updateSerial("AT+CMGDA=\"DEL ALL\"");
+	return message;
+}
+
 ISR(TIMER2_COMPA_vect)
 {
 	if (!(intervall % 100))
 	{
 		digitalWrite(LED, !digitalRead(LED));
 	}
-	if (intervall++ >= INTERVALL * 100)
+	if (intervall++ >= INTERVALL)
 	{
 		intervall = 0;
 		if (sendEnable)
@@ -189,28 +228,4 @@ ISR(TIMER2_COMPA_vect)
 			startSend = true;
 		}
 	}
-}
-
-String getSMS()
-{
-	String message = "";
-	boolean started = false;
-	Serial.println("Get SMS");
-	delay(500);
-	while (mySerial.available())
-	{
-		int c = mySerial.read();
-		if(c == 13) {
-			started = true; 
-		}
-		if(started) {
-			message += (char)c;
-		}
-		Serial.write(c);
-	}
-
-	message = message.substring(2, message.length()-2);
-	Serial.println("Message: " + message);
-	//updateSerial("AT+CMGDA=\"DEL ALL\"");
-	return message;	
 }
