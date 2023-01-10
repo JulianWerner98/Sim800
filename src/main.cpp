@@ -57,8 +57,8 @@ void setup()
   // delay(60000);
   errorHandling();
   delay(10000);
-  ;
-  sendSMS("Module ready"+ updateSerial("AT+CSQ"));
+  String signal = updateSerial("AT+CSQ");
+  sendSMS("Module ready"+ signal.substring(4, signal.length() - 2));
   digitalWrite(5, LOW);
 }
 
@@ -66,22 +66,16 @@ void loop()
 {
   if (incommingMessage)
   {
-    updateSerial("");
-    delay(500);
-    updateSerial("");
     delay(1000);
-    Serial.println("Get the Shit");
-    String value = updateSerial("AT+CMGL=\"ALL\"");
-    //delay(1000);
-    //Serial.println(value);
-    int index = value.lastIndexOf('"');
-    Serial.println(index);
-    if (index > -1)
-    {
-      Serial.print("Nachricht: " + value.substring(index + 3));
-      sendSMS("Nachricht: " + value.substring(index + 3));
+    String sms = mySerial.readString();
+    Serial.println(sms);
+    int index = sms.lastIndexOf(':');
+    if(index > -1) {
+      String message = sms.substring(index);
+      Serial.println("Message is :" + message);
+      sendSMS("Message is : " + message);
     }
-  
+    
     incommingMessage = false;
     digitalWrite(INTERRUPT_LED, LOW);
   }
@@ -160,7 +154,7 @@ void errorHandling()
     }
   } while ((!returnValue.equals("+CREG: 0,1OK")) && !returnValue.equals("+CREG: 0,5OK"));
   updateSerial("AT+CMGF=1");
-  updateSerial("AT+CNMI=0,0");
+  updateSerial("AT+CNMI=1,2,0,0,0");
   updateSerial("AT+CMGDA=\"DEL ALL\"");
   updateSerial("AT+CSQ");
   updateSerial("AT+CCID");
