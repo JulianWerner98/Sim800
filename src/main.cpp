@@ -49,8 +49,7 @@ void setup()
   // Timer/Counter Interrupt Mask Register
   TIMSK2 |= (1 << OCIE2A); // Output Compare A Match Interrupt Enable
 
-  attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), ring, FALLING); // Set Interrupt
-  sei();                                                                // allow interrupts
+  sei(); // allow interrupts
 
   Serial.println("Initializing...");
 
@@ -58,26 +57,38 @@ void setup()
   errorHandling();
   delay(10000);
   String signal = updateSerial("AT+CSQ");
-  sendSMS("Module ready"+ signal.substring(4, signal.length() - 2));
+  sendSMS("Module ready" + signal.substring(4, signal.length() - 2));
   digitalWrite(5, LOW);
 }
 
 void loop()
 {
-  if (incommingMessage)
+  if (mySerial.available())
   {
-    delay(1000);
-    String sms = mySerial.readString();
-    Serial.println(sms);
-    int index = sms.lastIndexOf(':');
-    if(index > -1) {
-      String message = sms.substring(index);
-      Serial.println("Message is :" + message);
-      sendSMS("Message is : " + message);
+    Serial.println("Data available");
+    String message = mySerial.readString();
+    Serial.println(message);
+    message.toLowerCase();
+    int index = message.indexOf("on");
+    boolean on = index >= 0;
+    String sendMessage = "";
+    if (message.indexOf("relais1") > -1)
+    {
+      sendMessage = "Relais 1 is ";
+      sendMessage += on ? "on" : "off";
+      Serial.println(sendMessage);
+      sendSMS(sendMessage);
+      digitalWrite(INTERRUPT_LED, on);
     }
-    
-    incommingMessage = false;
-    digitalWrite(INTERRUPT_LED, LOW);
+    else if (message.indexOf("relais2") > -1)
+    {
+      sendMessage = "Relais 2 is ";
+      sendMessage += on ? "on" : "off";
+      Serial.println(sendMessage);
+      sendSMS(sendMessage);
+      digitalWrite(FAIL_LED, on);
+    }
+    message = "";
   }
   delay(500);
 }
@@ -103,7 +114,7 @@ String updateSerial(String message = "")
     if (c != 13 && c != 10)
     {
       back += (char)c;
-      //Serial.write(c);
+      // Serial.write(c);
     }
   }
   back = back.substring(message.length());
@@ -172,6 +183,7 @@ void resetSim()
   delay(20000);
   Serial.println("End Reset");
 }
+
 void sendSMS(String message)
 {
   Serial.println("Send SMS");
@@ -218,16 +230,6 @@ String getSMS()
   Serial.println("Message is : " + message);
   updateSerial("AT+CMGDA=\"DEL ALL\"");
   return message;
-}
-
-void ring()
-{
-  if (activ)
-  {
-    Serial.println("Incoming Message");
-    digitalWrite(INTERRUPT_LED, HIGH);
-    incommingMessage = true;
-  }
 }
 
 ISR(TIMER2_COMPA_vect)
