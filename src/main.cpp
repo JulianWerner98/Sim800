@@ -1,18 +1,16 @@
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 
-SoftwareSerial mySerial(8, 9); // RX, TX
+SoftwareSerial mySerial(18, 19); // RX, TX
 long intervall = 0;
 int tries = 0;
 boolean activ = false;
 boolean incommingMessage = false;
 
 #define INTERVALL 300 * 100 // in sek * 100
-#define RESET 2
+#define RESET 16
 #define LED 13
-#define INTERRUPT_PIN 3
-#define INTERRUPT_LED 4
-#define FAIL_LED 5
+#define FAIL_LED 17
 
 // XX = country code, e.g. "49" for Germany and xxxxxxxxxxx = phone number
 const char TELEFONE_NUMBER[] = "+491729999128";
@@ -27,11 +25,9 @@ void ring();
 void setup()
 {
   pinMode(RESET, OUTPUT);
-  digitalWrite(RESET, LOW);
+  digitalWrite(RESET, HIGH);
   pinMode(LED, OUTPUT);
   pinMode(FAIL_LED, OUTPUT);
-  pinMode(INTERRUPT_LED, OUTPUT);
-  pinMode(INTERRUPT_PIN, INPUT);
   digitalWrite(FAIL_LED, HIGH);
   Serial.begin(9600);
   mySerial.begin(9600);
@@ -78,15 +74,14 @@ void loop()
       sendMessage += on ? "on" : "off";
       Serial.println(sendMessage);
       sendSMS(sendMessage);
-      digitalWrite(INTERRUPT_LED, on);
     }
     else if (message.indexOf("relais2") > -1)
     {
       sendMessage = "Relais 2 is ";
       sendMessage += on ? "on" : "off";
       Serial.println(sendMessage);
-      sendSMS(sendMessage);
       digitalWrite(FAIL_LED, on);
+      sendSMS(sendMessage);
     }
     message = "";
   }
@@ -177,9 +172,9 @@ void errorHandling()
 void resetSim()
 {
   Serial.println("Start Reset");
-  digitalWrite(RESET, HIGH);
-  delay(1000);
   digitalWrite(RESET, LOW);
+  delay(1000);
+  digitalWrite(RESET, HIGH);
   delay(20000);
   Serial.println("End Reset");
 }
